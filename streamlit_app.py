@@ -213,7 +213,34 @@ if "selected_voice" not in st.session_state:
     st.session_state.selected_voice = list(VOICES.keys())[0]
 
 # ---------------------------------------------------------------------------
-# Voice selection - searchable cards
+# Text input - sab se upar
+# ---------------------------------------------------------------------------
+text_input = st.text_area(
+    "Apna text yahan likhein",
+    height=250,
+    placeholder="Yahan apna Urdu, Hindi ya English text likhein...",
+)
+st.caption(
+    "💡 `[pause:2]` = 2 second ka pause  •  `[voice:Guy]` = beech script mein voice badlein"
+)
+
+# Live stats: word count, character count, estimated duration - text box ke sath hi
+word_count = len(text_input.split()) if text_input.strip() else 0
+char_count = len(text_input)
+# Andaza: normal speed per ~150 alfaz/minute bolti hain voices
+est_seconds = (word_count / 150) * 60 if word_count else 0
+est_minutes = int(est_seconds // 60)
+est_secs_remainder = int(est_seconds % 60)
+
+stat1, stat2, stat3 = st.columns(3)
+stat1.metric("Words", word_count)
+stat2.metric("Characters", char_count)
+stat3.metric("Andazan Duration", f"{est_minutes}:{est_secs_remainder:02d}")
+
+st.divider()
+
+# ---------------------------------------------------------------------------
+# Voice selection - searchable cards (text box ke neeche)
 # ---------------------------------------------------------------------------
 st.subheader("🎭 Voice Chunein")
 search_query = st.text_input(
@@ -248,51 +275,31 @@ else:
                     if st.button("🔈", key=f"preview_{label}", use_container_width=True, help="Is voice ka sample sunein"):
                         with st.spinner("Loading..."):
                             p = preview_voice(label)
-                        st.audio(p)
+                        with open(p, "rb") as f:
+                            preview_bytes = f.read()
                         os.remove(p)
+                        st.audio(preview_bytes, autoplay=True)
 
 voice_label = st.session_state.selected_voice
 st.caption(f"Ab select ki hui voice: **{voice_label}**")
 
-st.divider()
-
 col1, col2 = st.columns([2, 1])
 
 with col1:
-    text_input = st.text_area(
-        "Apna text yahan likhein",
-        height=250,
-        placeholder="Yahan apna Urdu, Hindi ya English text likhein...",
-    )
-    st.caption(
-        "💡 `[pause:2]` = 2 second ka pause  •  `[voice:Guy]` = beech script mein voice badlein"
-    )
-
-    # Live stats: word count, character count, estimated duration
-    word_count = len(text_input.split()) if text_input.strip() else 0
-    char_count = len(text_input)
-    # Andaza: normal speed per ~150 alfaz/minute bolti hain voices
-    est_seconds = (word_count / 150) * 60 if word_count else 0
-    est_minutes = int(est_seconds // 60)
-    est_secs_remainder = int(est_seconds % 60)
-
-    stat1, stat2, stat3 = st.columns(3)
-    stat1.metric("Words", word_count)
-    stat2.metric("Characters", char_count)
-    stat3.metric("Andazan Duration", f"{est_minutes}:{est_secs_remainder:02d}")
+    with st.expander("⚙️ Advanced Controls", expanded=False):
+        speed_percent = st.slider("Speed (%)", min_value=-50, max_value=100, value=0, step=5)
+        pitch_hz = st.slider("Pitch (Hz)", min_value=-50, max_value=50, value=0, step=5)
+        volume_percent = st.slider("Volume (%)", min_value=-50, max_value=50, value=0, step=5)
 
 with col2:
     if st.button("🔈 Sunein (Apna Text Preview)"):
         with st.spinner("Preview ban raha hai..."):
             preview_path = preview_voice(voice_label, text_input)
-        st.audio(preview_path)
+        with open(preview_path, "rb") as f:
+            preview_bytes = f.read()
         os.remove(preview_path)
+        st.audio(preview_bytes, autoplay=True)
     st.caption("Ap ka likha hua text bolegi (pehle 200 characters). Khali chorne per generic sample sunayi degi.")
-
-    with st.expander("⚙️ Advanced Controls", expanded=False):
-        speed_percent = st.slider("Speed (%)", min_value=-50, max_value=100, value=0, step=5)
-        pitch_hz = st.slider("Pitch (Hz)", min_value=-50, max_value=50, value=0, step=5)
-        volume_percent = st.slider("Volume (%)", min_value=-50, max_value=50, value=0, step=5)
 
 st.divider()
 
