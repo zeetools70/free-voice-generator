@@ -186,9 +186,15 @@ def generate_speech(text, voice_label, speed_percent, pitch_hz, volume_percent, 
                     pass
 
 
-def preview_voice(voice_label):
+def preview_voice(voice_label, user_text=""):
     voice = VOICES[voice_label]
-    sample_text = get_sample_text(voice)
+    # Agar user ne apna text likha hai to wohi preview mein bolwayen (pehla ~200 characters),
+    # taake pata chale unka apna content is voice mein kaisa sunai dega
+    clean_text = user_text.strip() if user_text else ""
+    if clean_text:
+        sample_text = clean_text[:200]
+    else:
+        sample_text = get_sample_text(voice)
     fd, temp_path = tempfile.mkstemp(suffix=".mp3")
     os.close(fd)
     asyncio.run(_edge_tts_generate(sample_text, voice, "+0%", temp_path))
@@ -202,6 +208,53 @@ st.set_page_config(page_title="Zee Free Voice Generator", page_icon="🎙️", l
 
 st.title("🎙️ Zee Free Voice Generator")
 st.caption("Urdu / Hindi / English — Unlimited & Free")
+
+if "selected_voice" not in st.session_state:
+    st.session_state.selected_voice = list(VOICES.keys())[0]
+
+# ---------------------------------------------------------------------------
+# Voice selection - searchable cards
+# ---------------------------------------------------------------------------
+st.subheader("🎭 Voice Chunein")
+search_query = st.text_input(
+    "🔍 Voice search karein", placeholder="jaise: Urdu, Male, Female, Storytelling, Deep, Guy..."
+)
+
+if search_query:
+    filtered_voices = [label for label in VOICES if search_query.lower() in label.lower()]
+else:
+    filtered_voices = list(VOICES.keys())
+
+if not filtered_voices:
+    st.info("Koi voice is naam/keyword se nahi mili — doosra keyword try karein.")
+else:
+    cols = st.columns(3)
+    for i, label in enumerate(filtered_voices):
+        with cols[i % 3]:
+            with st.container(border=True):
+                is_selected = label == st.session_state.selected_voice
+                st.markdown(f"**{'✅ ' if is_selected else ''}{label}**")
+                btn_cols = st.columns([1, 1])
+                with btn_cols[0]:
+                    if st.button(
+                        "Selected" if is_selected else "Select",
+                        key=f"select_{label}",
+                        disabled=is_selected,
+                        use_container_width=True,
+                    ):
+                        st.session_state.selected_voice = label
+                        st.rerun()
+                with btn_cols[1]:
+                    if st.button("🔈", key=f"preview_{label}", use_container_width=True, help="Is voice ka sample sunein"):
+                        with st.spinner("Loading..."):
+                            p = preview_voice(label)
+                        st.audio(p)
+                        os.remove(p)
+
+voice_label = st.session_state.selected_voice
+st.caption(f"Ab select ki hui voice: **{voice_label}**")
+
+st.divider()
 
 col1, col2 = st.columns([2, 1])
 
@@ -229,13 +282,12 @@ with col1:
     stat3.metric("Andazan Duration", f"{est_minutes}:{est_secs_remainder:02d}")
 
 with col2:
-    voice_label = st.selectbox("Voice chunein", list(VOICES.keys()))
-
-    if st.button("🔈 Sunein (Preview)"):
+    if st.button("🔈 Sunein (Apna Text Preview)"):
         with st.spinner("Preview ban raha hai..."):
-            preview_path = preview_voice(voice_label)
+            preview_path = preview_voice(voice_label, text_input)
         st.audio(preview_path)
         os.remove(preview_path)
+    st.caption("Ap ka likha hua text bolegi (pehle 200 characters). Khali chorne per generic sample sunayi degi.")
 
     with st.expander("⚙️ Advanced Controls", expanded=False):
         speed_percent = st.slider("Speed (%)", min_value=-50, max_value=100, value=0, step=5)
