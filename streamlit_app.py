@@ -242,6 +242,11 @@ if "selected_voice" not in st.session_state:
 if "history" not in st.session_state:
     st.session_state.history = []
 
+if "preview_cache" not in st.session_state:
+    st.session_state.preview_cache = {}
+
+voice_label = st.session_state.selected_voice
+
 # ---------------------------------------------------------------------------
 # Text input (left) + Generated Audios history (right) - jaisy reference design mein tha
 # ---------------------------------------------------------------------------
@@ -271,6 +276,43 @@ with input_col:
     stat1.metric("Words", word_count)
     stat2.metric("Characters", char_count)
     stat3.metric("Andazan Duration", f"{est_minutes}:{est_secs_remainder:02d}")
+
+    with st.expander("⚙️ Advanced Controls", expanded=False):
+        speed_percent = st.slider("Speed (%)", min_value=-50, max_value=100, value=0, step=5)
+        pitch_hz = st.slider("Pitch (Hz)", min_value=-50, max_value=50, value=0, step=5)
+        volume_percent = st.slider("Volume (%)", min_value=-50, max_value=50, value=0, step=5)
+
+    st.caption(f"Selected voice: **{VOICE_META[voice_label]['name']}** ({VOICE_META[voice_label]['language']})")
+
+    if st.button("🔊 Generate Voice", type="primary", use_container_width=True):
+        if not text_input.strip():
+            st.warning("Pehle kuch text likhein.")
+        else:
+            progress_bar = st.progress(0, text="Shuru ho raha hai...")
+
+            def update_progress(fraction, label):
+                progress_bar.progress(fraction, text=f"{label}  ({int(fraction * 100)}%)")
+
+            out_path = generate_speech(
+                text_input, voice_label, speed_percent, pitch_hz, volume_percent, update_progress
+            )
+            progress_bar.empty()
+
+            with open(out_path, "rb") as f:
+                audio_bytes = f.read()
+            os.remove(out_path)
+
+            meta = VOICE_META[voice_label]
+            st.session_state.history.insert(0, {
+                "id": uuid.uuid4().hex[:8],
+                "text": text_input,
+                "voice_name": meta["name"],
+                "language": meta["language"],
+                "gender": meta["gender"],
+                "timestamp": datetime.now().strftime("%b %d, %Y, %I:%M:%S %p"),
+                "audio_bytes": audio_bytes,
+            })
+            st.rerun()
 
 with history_col:
     st.subheader("🗂️ Generated Audios")
@@ -306,6 +348,7 @@ st.divider()
 
 # ---------------------------------------------------------------------------
 # Voice selection - searchable cards with tags (Speechma-style)
+# Card per click = voice select. "▶" button = sirf play/pause (persistent player).
 # ---------------------------------------------------------------------------
 st.subheader("🎭 Voice Chunein")
 
@@ -338,70 +381,22 @@ else:
         with cols[i % 3]:
             with st.container(border=True):
                 is_selected = label == st.session_state.selected_voice
-                title_col, play_col = st.columns([4, 1])
-                with title_col:
-                    st.markdown(f"**{'✅ ' if is_selected else ''}{meta['name']}**")
-                    st.caption(f"`{meta['gender']}`  `{meta['language']}`  `{meta['style']}`")
-                with play_col:
-                    if st.button("▶", key=f"play_{label}", help="Select + Sunein", use_container_width=True):
-                        st.session_state.selected_voice = label
-                        with st.spinner("Loading..."):
-                            p = preview_voice(label)
-                        with open(p, "rb") as f:
-                            preview_bytes = f.read()
-                        os.remove(p)
-                        st.audio(preview_bytes, autoplay=True)
-                        st.rerun()
 
-voice_label = st.session_state.selected_voice
-st.caption(f"Ab select ki hui voice: **{VOICE_META[voice_label]['name']}** ({VOICE_META[voice_label]['language']})")
+                # Card ke naam per click = select (poora card jaisa behavior)
+                card_title = f"{'✅ ' if is_selected else ''}{meta['name']}"
+                if st.button(card_title, key=f"select_{label}", use_container_width=True):
+                    st.session_state.selected_voice = label
+                    st.rerun()
 
-col1, col2 = st.columns([2, 1])
+                st.caption(f"`{meta['gender']}`  `{meta['language']}`  `{meta['style']}`")
 
-with col1:
-    with st.expander("⚙️ Advanced Controls", expanded=False):
-        speed_percent = st.slider("Speed (%)", min_value=-50, max_value=100, value=0, step=5)
-        pitch_hz = st.slider("Pitch (Hz)", min_value=-50, max_value=50, value=0, step=5)
-        volume_percent = st.slider("Volume (%)", min_value=-50, max_value=50, value=0, step=5)
+                # "▶" sirf preview generate/cache karta hai - audio player khud play/pause control deta hai
+                if st.button("▶ Sunein", key=f"gen_{label}", use_container_width=True):
+                    with st.spinner("Loading..."):
+                        p = preview_voice(label)
+                    with open(p, "rb") as f:
+                        st.session_state.preview_cache[label] = f.read()
+                    os.remove(p)
 
-with col2:
-    if st.button("🔈 Sunein (Apna Text Preview)"):
-        with st.spinner("Preview ban raha hai..."):
-            preview_path = preview_voice(voice_label, text_input)
-        with open(preview_path, "rb") as f:
-            preview_bytes = f.read()
-        os.remove(preview_path)
-        st.audio(preview_bytes, autoplay=True)
-    st.caption("Ap ka likha hua text bolegi (pehle 200 characters). Khali chorne per generic sample sunayi degi.")
-
-st.divider()
-
-if st.button("🔊 Generate Voice", type="primary"):
-    if not text_input.strip():
-        st.warning("Pehle kuch text likhein.")
-    else:
-        progress_bar = st.progress(0, text="Shuru ho raha hai...")
-
-        def update_progress(fraction, label):
-            progress_bar.progress(fraction, text=f"{label}  ({int(fraction * 100)}%)")
-
-        out_path = generate_speech(
-            text_input, voice_label, speed_percent, pitch_hz, volume_percent, update_progress
-        )
-        progress_bar.empty()
-
-        with open(out_path, "rb") as f:
-            audio_bytes = f.read()
-        os.remove(out_path)
-
-        meta = VOICE_META[voice_label]
-        st.session_state.history.insert(0, {
-            "id": uuid.uuid4().hex[:8],
-            "text": text_input,
-            "voice_name": meta["name"],
-            "language": meta["language"],
-            "gender": meta["gender"],
-            "timestamp": datetime.now().strftime("%b %d, %Y, %I:%M:%S %p"),
-            "audio_bytes": audio_bytes,
-        })
-        st.rerun()
+                if label in st.session_state.preview_cache:
+                    st.audio(st.session_state.preview_cache[label], format="audio/mp3")
