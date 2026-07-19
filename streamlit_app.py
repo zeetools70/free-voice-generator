@@ -21,6 +21,8 @@ import asyncio
 import os
 import re
 import tempfile
+import uuid
+from datetime import datetime
 
 import edge_tts
 import streamlit as st
@@ -107,6 +109,20 @@ def parse_script(text, default_voice_label):
         flush_text(text[last_end:], current_label)
 
     return steps if steps else [("speech", text, VOICES[default_voice_label])]
+
+
+def parse_voice_label(label):
+    """'Urdu (Male) - Asad — Normal/Narration' ko parts mein todta hai (display k liye)."""
+    lang_part, rest = label.split(" (", 1)
+    gender, rest2 = rest.split(") - ", 1)
+    if " — " in rest2:
+        name, style = rest2.split(" — ", 1)
+    else:
+        name, style = rest2, ""
+    return {"language": lang_part.strip(), "gender": gender.strip(), "name": name.strip(), "style": style.strip()}
+
+
+VOICE_META = {label: parse_voice_label(label) for label in VOICES}
 
 
 def get_sample_text(voice_code):
@@ -209,79 +225,136 @@ st.set_page_config(page_title="Zee Free Voice Generator", page_icon="🎙️", l
 st.title("🎙️ Zee Free Voice Generator")
 st.caption("Urdu / Hindi / English — Unlimited & Free")
 
+st.markdown(
+    """
+    <style>
+    div.stButton > button {
+        border-radius: 50px;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 if "selected_voice" not in st.session_state:
     st.session_state.selected_voice = list(VOICES.keys())[0]
 
-# ---------------------------------------------------------------------------
-# Text input - sab se upar
-# ---------------------------------------------------------------------------
-text_input = st.text_area(
-    "Apna text yahan likhein",
-    height=250,
-    placeholder="Yahan apna Urdu, Hindi ya English text likhein...",
-)
-st.caption(
-    "💡 `[pause:2]` = 2 second ka pause  •  `[voice:Guy]` = beech script mein voice badlein"
-)
+if "history" not in st.session_state:
+    st.session_state.history = []
 
-# Live stats: word count, character count, estimated duration - text box ke sath hi
-word_count = len(text_input.split()) if text_input.strip() else 0
-char_count = len(text_input)
-# Andaza: normal speed per ~150 alfaz/minute bolti hain voices
-est_seconds = (word_count / 150) * 60 if word_count else 0
-est_minutes = int(est_seconds // 60)
-est_secs_remainder = int(est_seconds % 60)
+# ---------------------------------------------------------------------------
+# Text input (left) + Generated Audios history (right) - jaisy reference design mein tha
+# ---------------------------------------------------------------------------
+input_col, history_col = st.columns([3, 2])
 
-stat1, stat2, stat3 = st.columns(3)
-stat1.metric("Words", word_count)
-stat2.metric("Characters", char_count)
-stat3.metric("Andazan Duration", f"{est_minutes}:{est_secs_remainder:02d}")
+with input_col:
+    st.subheader("📝 Input Text")
+    text_input = st.text_area(
+        "Apna text yahan likhein",
+        height=250,
+        placeholder="Yahan apna Urdu, Hindi ya English text likhein...",
+        label_visibility="collapsed",
+    )
+    st.caption(
+        "💡 `[pause:2]` = 2 second ka pause  •  `[voice:Guy]` = beech script mein voice badlein"
+    )
+
+    # Live stats: word count, character count, estimated duration - text box ke sath hi
+    word_count = len(text_input.split()) if text_input.strip() else 0
+    char_count = len(text_input)
+    # Andaza: normal speed per ~150 alfaz/minute bolti hain voices
+    est_seconds = (word_count / 150) * 60 if word_count else 0
+    est_minutes = int(est_seconds // 60)
+    est_secs_remainder = int(est_seconds % 60)
+
+    stat1, stat2, stat3 = st.columns(3)
+    stat1.metric("Words", word_count)
+    stat2.metric("Characters", char_count)
+    stat3.metric("Andazan Duration", f"{est_minutes}:{est_secs_remainder:02d}")
+
+with history_col:
+    st.subheader("🗂️ Generated Audios")
+    if not st.session_state.history:
+        st.caption("Abhi tak koi audio generate nahi hui — text likh kar 'Generate Voice' per click karein.")
+    else:
+        for entry in st.session_state.history:
+            with st.container(border=True):
+                preview_text = entry["text"][:120] + ("..." if len(entry["text"]) > 120 else "")
+                st.markdown(f"{preview_text}")
+                st.caption(
+                    f"🎙️ {entry['voice_name']}   `{entry['language']}`   `{entry['gender']}`   🕒 {entry['timestamp']}"
+                )
+                st.audio(entry["audio_bytes"], format="audio/mp3")
+                dl_col, del_col = st.columns(2)
+                with dl_col:
+                    st.download_button(
+                        "⬇️ Download",
+                        entry["audio_bytes"],
+                        file_name=f"voice_{entry['id']}.mp3",
+                        mime="audio/mp3",
+                        key=f"dl_{entry['id']}",
+                        use_container_width=True,
+                    )
+                with del_col:
+                    if st.button("🗑️ Delete", key=f"del_{entry['id']}", use_container_width=True):
+                        st.session_state.history = [
+                            e for e in st.session_state.history if e["id"] != entry["id"]
+                        ]
+                        st.rerun()
 
 st.divider()
 
 # ---------------------------------------------------------------------------
-# Voice selection - searchable cards (text box ke neeche)
+# Voice selection - searchable cards with tags (Speechma-style)
 # ---------------------------------------------------------------------------
 st.subheader("🎭 Voice Chunein")
-search_query = st.text_input(
-    "🔍 Voice search karein", placeholder="jaise: Urdu, Male, Female, Storytelling, Deep, Guy..."
-)
 
+filter_col1, filter_col2, filter_col3 = st.columns([2, 1, 1])
+with filter_col1:
+    search_query = st.text_input(
+        "🔍 Voice search karein", placeholder="jaise: Asad, Storytelling, Deep..."
+    )
+with filter_col2:
+    languages = ["All Languages"] + sorted({meta["language"] for meta in VOICE_META.values()})
+    language_filter = st.selectbox("Language", languages)
+with filter_col3:
+    genders = ["All Genders"] + sorted({meta["gender"] for meta in VOICE_META.values()})
+    gender_filter = st.selectbox("Gender", genders)
+
+filtered_voices = list(VOICES.keys())
 if search_query:
-    filtered_voices = [label for label in VOICES if search_query.lower() in label.lower()]
-else:
-    filtered_voices = list(VOICES.keys())
+    filtered_voices = [l for l in filtered_voices if search_query.lower() in l.lower()]
+if language_filter != "All Languages":
+    filtered_voices = [l for l in filtered_voices if VOICE_META[l]["language"] == language_filter]
+if gender_filter != "All Genders":
+    filtered_voices = [l for l in filtered_voices if VOICE_META[l]["gender"] == gender_filter]
 
 if not filtered_voices:
-    st.info("Koi voice is naam/keyword se nahi mili — doosra keyword try karein.")
+    st.info("Koi voice in filters se nahi mili — filter badal kar dekhein.")
 else:
     cols = st.columns(3)
     for i, label in enumerate(filtered_voices):
+        meta = VOICE_META[label]
         with cols[i % 3]:
             with st.container(border=True):
                 is_selected = label == st.session_state.selected_voice
-                st.markdown(f"**{'✅ ' if is_selected else ''}{label}**")
-                btn_cols = st.columns([1, 1])
-                with btn_cols[0]:
-                    if st.button(
-                        "Selected" if is_selected else "Select",
-                        key=f"select_{label}",
-                        disabled=is_selected,
-                        use_container_width=True,
-                    ):
+                title_col, play_col = st.columns([4, 1])
+                with title_col:
+                    st.markdown(f"**{'✅ ' if is_selected else ''}{meta['name']}**")
+                    st.caption(f"`{meta['gender']}`  `{meta['language']}`  `{meta['style']}`")
+                with play_col:
+                    if st.button("▶", key=f"play_{label}", help="Select + Sunein", use_container_width=True):
                         st.session_state.selected_voice = label
-                        st.rerun()
-                with btn_cols[1]:
-                    if st.button("🔈", key=f"preview_{label}", use_container_width=True, help="Is voice ka sample sunein"):
                         with st.spinner("Loading..."):
                             p = preview_voice(label)
                         with open(p, "rb") as f:
                             preview_bytes = f.read()
                         os.remove(p)
                         st.audio(preview_bytes, autoplay=True)
+                        st.rerun()
 
 voice_label = st.session_state.selected_voice
-st.caption(f"Ab select ki hui voice: **{voice_label}**")
+st.caption(f"Ab select ki hui voice: **{VOICE_META[voice_label]['name']}** ({VOICE_META[voice_label]['language']})")
 
 col1, col2 = st.columns([2, 1])
 
@@ -317,9 +390,18 @@ if st.button("🔊 Generate Voice", type="primary"):
         )
         progress_bar.empty()
 
-        st.success("Awaz ban gayi hai!")
         with open(out_path, "rb") as f:
             audio_bytes = f.read()
-        st.audio(audio_bytes, format="audio/mp3")
-        st.download_button("💾 Download MP3", audio_bytes, file_name="voice_output.mp3", mime="audio/mp3")
         os.remove(out_path)
+
+        meta = VOICE_META[voice_label]
+        st.session_state.history.insert(0, {
+            "id": uuid.uuid4().hex[:8],
+            "text": text_input,
+            "voice_name": meta["name"],
+            "language": meta["language"],
+            "gender": meta["gender"],
+            "timestamp": datetime.now().strftime("%b %d, %Y, %I:%M:%S %p"),
+            "audio_bytes": audio_bytes,
+        })
+        st.rerun()
