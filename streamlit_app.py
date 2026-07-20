@@ -293,26 +293,38 @@ with input_col:
             def update_progress(fraction, label):
                 progress_bar.progress(fraction, text=f"{label}  ({int(fraction * 100)}%)")
 
-            out_path = generate_speech(
-                text_input, voice_label, speed_percent, pitch_hz, volume_percent, update_progress
-            )
-            progress_bar.empty()
+            try:
+                out_path = generate_speech(
+                    text_input, voice_label, speed_percent, pitch_hz, volume_percent, update_progress
+                )
+            except Exception as e:
+                progress_bar.empty()
+                st.error(
+                    "⚠️ Awaz generate nahi ho saki. Yeh voice service ki taraf se temporary "
+                    "masla ho sakta hai — internet connection check karein, ya thori dair "
+                    "baad dobara try karein."
+                )
+                st.caption(f"Technical detail: {e}")
+                out_path = None
 
-            with open(out_path, "rb") as f:
-                audio_bytes = f.read()
-            os.remove(out_path)
+            if out_path:
+                progress_bar.empty()
 
-            meta = VOICE_META[voice_label]
-            st.session_state.history.insert(0, {
-                "id": uuid.uuid4().hex[:8],
-                "text": text_input,
-                "voice_name": meta["name"],
-                "language": meta["language"],
-                "gender": meta["gender"],
-                "timestamp": datetime.now().strftime("%b %d, %Y, %I:%M:%S %p"),
-                "audio_bytes": audio_bytes,
-            })
-            st.rerun()
+                with open(out_path, "rb") as f:
+                    audio_bytes = f.read()
+                os.remove(out_path)
+
+                meta = VOICE_META[voice_label]
+                st.session_state.history.insert(0, {
+                    "id": uuid.uuid4().hex[:8],
+                    "text": text_input,
+                    "voice_name": meta["name"],
+                    "language": meta["language"],
+                    "gender": meta["gender"],
+                    "timestamp": datetime.now().strftime("%b %d, %Y, %I:%M:%S %p"),
+                    "audio_bytes": audio_bytes,
+                })
+                st.rerun()
 
 with history_col:
     st.subheader("🗂️ Generated Audios")
@@ -392,11 +404,14 @@ else:
 
                 # "▶" sirf preview generate/cache karta hai - audio player khud play/pause control deta hai
                 if st.button("▶ Sunein", key=f"gen_{label}", use_container_width=True):
-                    with st.spinner("Loading..."):
-                        p = preview_voice(label)
-                    with open(p, "rb") as f:
-                        st.session_state.preview_cache[label] = f.read()
-                    os.remove(p)
+                    try:
+                        with st.spinner("Loading..."):
+                            p = preview_voice(label)
+                        with open(p, "rb") as f:
+                            st.session_state.preview_cache[label] = f.read()
+                        os.remove(p)
+                    except Exception:
+                        st.error("⚠️ Preview nahi ban saka. Internet check karein ya dobara try karein.")
 
                 if label in st.session_state.preview_cache:
                     st.audio(st.session_state.preview_cache[label], format="audio/mp3")
