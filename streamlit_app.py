@@ -344,7 +344,7 @@ with history_col:
                 st.caption(
                     f"🎙️ {entry['voice_name']}   `{entry['language']}`   `{entry['gender']}`   🕒 {entry['timestamp']}"
                 )
-                st.audio(entry["audio_bytes"], format="audio/mp3", key=f"audio_{entry['id']}")
+                st.audio(entry["audio_bytes"], format="audio/mp3")
                 dl_col, del_col = st.columns(2)
                 with dl_col:
                     st.download_button(
@@ -420,4 +420,4 @@ else:
                         st.error("⚠️ Preview nahi ban saka. Internet check karein ya dobara try karein.")
 
                 if label in st.session_state.preview_cache:
-                    st.audio(st.session_state.preview_cache[label], format="audio/mp3", key=f"audio_preview_{label}")
+                    st.audio(st.session_state.preview_cache[label], format="audio/mp3")
