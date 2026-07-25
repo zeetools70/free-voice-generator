@@ -35,6 +35,12 @@ VOICES = {
     "Urdu (Female) - Uzma — Soft/Calm": "ur-PK-UzmaNeural",
     "Hindi (Male) - Madhur — Narration/News": "hi-IN-MadhurNeural",
     "Hindi (Female) - Swara — Soft/Storytelling": "hi-IN-SwaraNeural",
+    "Hindi (Female) - Kavya — News/Anchor": "hi-IN-KavyaNeural",
+    "Hindi (Female) - Ananya — News/Professional": "hi-IN-AnanyaNeural",
+    "Hindi (Female) - Aarti — Clear/Formal": "hi-IN-AartiNeural",
+    "Hindi (Male) - Kunal — News/Confident": "hi-IN-KunalNeural",
+    "Hindi (Male) - Rehaan — Narration/Formal": "hi-IN-RehaanNeural",
+    "Hindi (Male) - Arjun — Deep/Authoritative": "hi-IN-ArjunNeural",
     "English US (Female) - Aria — Storytelling/Expressive": "en-US-AriaNeural",
     "English US (Female) - Jenny — Soft/Friendly": "en-US-JennyNeural",
     "English US (Female) - Emma — Warm/Clear": "en-US-EmmaNeural",
@@ -338,7 +344,7 @@ with history_col:
                 st.caption(
                     f"🎙️ {entry['voice_name']}   `{entry['language']}`   `{entry['gender']}`   🕒 {entry['timestamp']}"
                 )
-                st.audio(entry["audio_bytes"], format="audio/mp3")
+                st.audio(entry["audio_bytes"], format="audio/mp3", key=f"audio_{entry['id']}")
                 dl_col, del_col = st.columns(2)
                 with dl_col:
                     st.download_button(
@@ -414,4 +420,4 @@ else:
                         st.error("⚠️ Preview nahi ban saka. Internet check karein ya dobara try karein.")
 
                 if label in st.session_state.preview_cache:
-                    st.audio(st.session_state.preview_cache[label], format="audio/mp3")
+                    st.audio(st.session_state.preview_cache[label], format="audio/mp3", key=f"audio_preview_{label}")
