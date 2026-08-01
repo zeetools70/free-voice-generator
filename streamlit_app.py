@@ -33,29 +33,6 @@ import streamlit as st
 VOICES = {
     "Urdu (Male) - Asad — Normal/Narration": "ur-PK-AsadNeural",
     "Urdu (Female) - Uzma — Soft/Calm": "ur-PK-UzmaNeural",
-    "Hindi (Male) - Madhur — Narration/News": "hi-IN-MadhurNeural",
-    "Hindi (Female) - Swara — Soft/Storytelling": "hi-IN-SwaraNeural",
-    "Hindi (Female) - Kavya — News/Anchor": "hi-IN-KavyaNeural",
-    "Hindi (Female) - Ananya — News/Professional": "hi-IN-AnanyaNeural",
-    "Hindi (Female) - Aarti — Clear/Formal": "hi-IN-AartiNeural",
-    "Hindi (Male) - Kunal — News/Confident": "hi-IN-KunalNeural",
-    "Hindi (Male) - Rehaan — Narration/Formal": "hi-IN-RehaanNeural",
-    "Hindi (Male) - Arjun — Deep/Authoritative": "hi-IN-ArjunNeural",
-    "English US (Female) - Aria — Storytelling/Expressive": "en-US-AriaNeural",
-    "English US (Female) - Jenny — Soft/Friendly": "en-US-JennyNeural",
-    "English US (Female) - Emma — Warm/Clear": "en-US-EmmaNeural",
-    "English US (Female) - Ava — Expressive/Caring": "en-US-AvaNeural",
-    "English US (Female) - Michelle — Professional/Crisp": "en-US-MichelleNeural",
-    "English US (Male) - Guy — Narration/News": "en-US-GuyNeural",
-    "English US (Male) - Roger — Deep/Documentary": "en-US-RogerNeural",
-    "English US (Male) - Christopher — Deep/Authoritative": "en-US-ChristopherNeural",
-    "English US (Male) - Andrew — Warm/Confident Narration": "en-US-AndrewNeural",
-    "English US (Male) - Brian — Approachable/Casual": "en-US-BrianNeural",
-    "English US (Male) - Eric — Rational/Clear": "en-US-EricNeural",
-    "English UK (Female) - Sonia — Calm/Professional": "en-GB-SoniaNeural",
-    "English UK (Female) - Libby — Friendly/Positive": "en-GB-LibbyNeural",
-    "English UK (Male) - Ryan — Narration/Formal": "en-GB-RyanNeural",
-    "English UK (Male) - Thomas — Friendly/General": "en-GB-ThomasNeural",
 }
 
 SAMPLE_TEXTS = {
@@ -421,3 +398,55 @@ else:
 
                 if label in st.session_state.preview_cache:
                     st.audio(st.session_state.preview_cache[label], format="audio/mp3")
+
+# ---------------------------------------------------------------------------
+# Footer - "More voices coming soon" + suggestion + social links
+# ---------------------------------------------------------------------------
+st.divider()
+
+st.markdown(
+    """
+    <div style="
+        background: linear-gradient(135deg, #7c3aed 0%, #a855f7 50%, #ec4899 100%);
+        border-radius: 16px;
+        padding: 28px 24px;
+        text-align: center;
+        margin-top: 10px;
+    ">
+        <div style="font-size: 26px; font-weight: 800; color: white; letter-spacing: 0.5px;">
+            🚀 More Voices Are Coming Soon!
+        </div>
+        <div style="font-size: 15px; color: #f3e8ff; margin-top: 8px;">
+            Hum apni voice library barhate rehte hain — koi khaas voice chahiye? Hamein batayen!
+        </div>
+        <div style="margin-top: 18px; font-size: 15px; color: white;">
+            📩 <b>Kaunsi voice add karni chahiye?</b> Hamare Facebook ya YouTube per message karein
+        </div>
+        <div style="margin-top: 16px;">
+            <a href="https://www.facebook.com/zeeshanakram105" target="_blank" style="
+                display: inline-block;
+                background: #ffffff;
+                color: #1877F2;
+                font-weight: 700;
+                padding: 10px 22px;
+                border-radius: 30px;
+                text-decoration: none;
+                margin: 6px;
+                font-size: 14px;
+            ">📘 Facebook Page</a>
+            <a href="https://www.youtube.com/@zeeshanakram105" target="_blank" style="
+                display: inline-block;
+                background: #ffffff;
+                color: #FF0000;
+                font-weight: 700;
+                padding: 10px 22px;
+                border-radius: 30px;
+                text-decoration: none;
+                margin: 6px;
+                font-size: 14px;
+            ">▶️ YouTube Channel</a>
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
